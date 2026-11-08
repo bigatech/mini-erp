@@ -51,6 +51,16 @@ jobs:
         run: |
           docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml exec -T postgres sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
           test "$(docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml exec -T redis redis-cli ping)" = PONG
+      - name: Verify persistence after API restart
+        run: |
+          docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml restart api
+          docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml up -d --wait --wait-timeout 120
+          node -e "fetch('http://127.0.0.1:13000/api/v1/plm/models').then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(v=>{if(!v.data.some(m=>m.code==='CI-MODEL'))throw Error('Persistence failed')}).catch(e=>{console.error(e);process.exit(1)})"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: synthetic-ui-evidence
+          path: TestResults/ci-ui.png
       - name: Collect status
         if: always()
         run: docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml ps -a

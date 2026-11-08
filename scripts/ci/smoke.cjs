@@ -33,14 +33,18 @@ const post = (path, body, status) => request(path, status, {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(base + '/plm-models');
-    await page.getByText('CI synthetic model', {exact:true}).first().waitFor();
+    await page.getByLabel('PLM model seçimi').selectOption(model.id);
+    await page.getByText('CI-MODEL · CI synthetic model', {exact:true}).waitFor();
     // API error state and recovery must be visible, with no unhandled JS errors.
     await page.route('**/api/v1/plm/models', route => route.fulfill({status:503, contentType:'application/json', body:'{"title":"CI unavailable"}'}));
     await page.reload();
-    await page.getByText(/CI unavailable|503|yüklenemedi|erişilemiyor|başarısız/i).first().waitFor();
+    await page.getByRole('alert').filter({hasText:'CI unavailable'}).waitFor();
     await page.unroute('**/api/v1/plm/models');
     await page.reload();
-    await page.getByText('CI synthetic model', {exact:true}).first().waitFor();
+    await page.getByLabel('PLM model seçimi').selectOption(model.id);
+    await page.getByText('CI-MODEL · CI synthetic model', {exact:true}).waitFor();
+    require('node:fs').mkdirSync('TestResults', {recursive:true});
+    await page.screenshot({path:'TestResults/ci-ui.png', fullPage:true});
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
   console.log('PASS: production startup/schema, API 200/400/404/409, PostgreSQL persistence, MinIO image round trip, UI data/error/recovery');
