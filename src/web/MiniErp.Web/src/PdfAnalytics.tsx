@@ -1,4 +1,5 @@
 import React from 'react'
+import { AuthenticatedDownload } from './auth'
 import './PdfAnalytics.css'
 
 type Inputs = { actualProduced:number|null; qualityChecked:number|null; defects:number|null; shipped:number|null; workedHours:number|null; fabricUsedKg:number|null; unitCost:number|null; currency:string; notes:string; fieldValues?:Record<string,string> }
@@ -36,7 +37,7 @@ export default function PdfAnalytics({api}:{api:string}) {
  const shipmentMismatch=draft?.shipped!=null&&draft.actualProduced!=null&&draft.shipped>draft.actualProduced
  const metrics=[['Üretim / iş emri',ratio(draft?.actualProduced,workQty),'%'],['Hata oranı',qualityMismatch?null:ratio(draft?.defects,draft?.qualityChecked),'%'],['Sevk / tamamlanan',shipmentMismatch?null:ratio(draft?.shipped,draft?.actualProduced),'%'],['Saat başına üretim',ratio(draft?.actualProduced,draft?.workedHours),'adet/saat'],['Birim kumaş kullanımı',ratio(draft?.fabricUsedKg,draft?.actualProduced),'kg/adet']] as const
  return <div className="pdf-analytics">
-  <section className="filter-bar pdf-actions"><a className="primary-button" href={api+'/api/v1/data-intake/worksheet/source.xlsx'}>Excel indir</a><a href={api+'/api/v1/data-intake/worksheet/source.pdf'} target="_blank" rel="noreferrer">Kaynak PDF’yi aç</a><button type="button" disabled={busy||loading} onClick={()=>{setNotice('');setRevision(v=>v+1)}}>{dirty?'Değişiklikleri bırak ve yenile':'Verileri yenile'}</button><span>{data?.updatedAt?`Son kayıt: ${new Date(data.updatedAt).toLocaleString('tr-TR')}`:'Henüz kullanıcı girdisi kaydedilmedi.'}</span></section>
+  <section className="filter-bar pdf-actions"><AuthenticatedDownload url={api+'/api/v1/data-intake/worksheet/source.xlsx'} fileName="kaynak.xlsx">Excel indir</AuthenticatedDownload><AuthenticatedDownload url={api+'/api/v1/data-intake/worksheet/source.pdf'} fileName="kaynak.pdf">Kaynak PDF’yi indir</AuthenticatedDownload><button type="button" disabled={busy||loading} onClick={()=>{setNotice('');setRevision(v=>v+1)}}>{dirty?'Değişiklikleri bırak ve yenile':'Verileri yenile'}</button><span>{data?.updatedAt?`Son kayıt: ${new Date(data.updatedAt).toLocaleString('tr-TR')}`:'Henüz kullanıcı girdisi kaydedilmedi.'}</span></section>
   {error&&<p role="alert" className="feedback error">{error}</p>}{notice&&<p role="status" className="feedback success">{notice}</p>}{loading&&<p role="status">İş emri analizi yükleniyor…</p>}
   {!loading&&data&&draft&&source&&<>
    <div className="stats-row process-kpis">{[['Sipariş',orderQty],['İş emri',workQty],['Kesim tablosu',cutQty],['İş emri fazlası',surplus]].map(([name,value])=><article className="stat-card" key={String(name)}><div><small>{name}</small><b>{fmt(value as number|null)} <span className="metric-unit">adet</span></b></div></article>)}</div>
