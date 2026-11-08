@@ -66,7 +66,9 @@ jobs:
           path: TestResults/ci-ui.png
       - name: Collect status
         if: always()
-        run: docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml ps -a
+        run: |
+          docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml ps -a
+          docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml logs --no-color --tail 40 web
       - name: Remove disposable stack
         if: always()
         run: docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml down --volumes --remove-orphans
