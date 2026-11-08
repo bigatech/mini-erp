@@ -1,4 +1,5 @@
 import React from 'react'
+import { AuthenticatedImage } from './auth'
 
 type ModelImage = {id:string;modelId:string;fileName:string;contentType:string;size:number;uploadedAt:string;url:string}
 const allowedTypes = ['image/png','image/jpeg','image/webp']
@@ -7,7 +8,6 @@ const maximumSize = 5 * 1024 * 1024
 export default function ModelImages({api,modelId}:{api:string;modelId:string}) {
  const [images,setImages]=React.useState<ModelImage[]>([]),[file,setFile]=React.useState<File|null>(null)
  const [loading,setLoading]=React.useState(true),[busy,setBusy]=React.useState(false),[error,setError]=React.useState(''),[notice,setNotice]=React.useState('')
- const [failed,setFailed]=React.useState<Set<string>>(new Set())
  const generation=React.useRef(0),upload=React.useRef<AbortController|null>(null),input=React.useRef<HTMLInputElement>(null)
  const path=`/api/v1/plm/models/${encodeURIComponent(modelId)}/images`
  async function load(signal:AbortSignal):Promise<ModelImage[]> {
@@ -17,7 +17,7 @@ export default function ModelImages({api,modelId}:{api:string;modelId:string}) {
  }
  React.useEffect(()=>{
   const current=++generation.current,controller=new AbortController()
-  upload.current?.abort();upload.current=null;setImages([]);setFile(null);setError('');setNotice('');setBusy(false);setLoading(true);setFailed(new Set())
+  upload.current?.abort();upload.current=null;setImages([]);setFile(null);setError('');setNotice('');setBusy(false);setLoading(true)
   if(input.current)input.current.value=''
   void load(controller.signal).then(rows=>{if(current===generation.current)setImages(rows)}).catch(e=>{if(e.name!=='AbortError'&&current===generation.current)setError(e.message)}).finally(()=>{if(current===generation.current&&!controller.signal.aborted)setLoading(false)})
   return()=>{controller.abort();upload.current?.abort()}
@@ -49,7 +49,7 @@ export default function ModelImages({api,modelId}:{api:string;modelId:string}) {
   {loading?<p role="status">Model görselleri yükleniyor…</p>:!images.length?<p>Bu modele henüz görsel eklenmedi.</p>:<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:16,marginTop:16}}>{images.map(image=>{
    const imageUrl=image.url.startsWith('/api/v1/plm/models/')?api+image.url:''
    return <figure key={image.id} style={{margin:0,border:'1px solid #d5dce4',borderRadius:10,padding:10}}>
-    {failed.has(image.id)||!imageUrl?<p>Görsel yüklenemedi.</p>:<a href={imageUrl} target="_blank" rel="noreferrer"><img loading="lazy" src={imageUrl} alt={image.fileName} style={{width:'100%',height:170,objectFit:'contain'}} onError={()=>setFailed(previous=>new Set(previous).add(image.id))}/></a>}
+    {!imageUrl?<p>Görsel yüklenemedi.</p>:<AuthenticatedImage url={imageUrl} alt={image.fileName}/>}
     <figcaption style={{overflowWrap:'anywhere'}}><b>{image.fileName}</b><br/><small>{(image.size/1024).toLocaleString('tr-TR',{maximumFractionDigits:1})} KB · {new Date(image.uploadedAt).toLocaleString('tr-TR')}</small></figcaption>
    </figure>
   })}</div>}

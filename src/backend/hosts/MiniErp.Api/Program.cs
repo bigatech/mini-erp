@@ -22,6 +22,7 @@ builder.Logging.AddJsonConsole(options =>
 });
 
 builder.Services.AddHealthChecks();
+builder.Services.AddApiAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddProductLifecycle(builder.Configuration.GetConnectionString("Primary"));
 builder.Services.AddDataIntakeAnalytics(builder.Configuration.GetConnectionString("Primary"));
 builder.Services.AddSharedDefinitions();
@@ -57,6 +58,9 @@ app.UseDataIntakeAnalytics();
 app.UseExceptionHandler();
 if (app.Environment.IsDevelopment())
     app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapAuthenticationSession();
 
 app.MapGet("/", () => Results.Content("""
     <!doctype html>
@@ -77,13 +81,13 @@ app.MapGet("/", () => Results.Content("""
       </main>
     </body>
     </html>
-    """, "text/html; charset=utf-8"));
+    """, "text/html; charset=utf-8")).AllowAnonymous();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = _ => false
-});
-app.MapHealthChecks("/health/ready");
+}).AllowAnonymous();
+app.MapHealthChecks("/health/ready").AllowAnonymous();
 
 app.MapProductLifecycle();
 app.MapSharedDefinitions();

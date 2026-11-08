@@ -28,6 +28,9 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: "8080"
       Cors__WebOrigin: "http://localhost:${WEB_PORT:-3000}"
+      Auth__Authority: http://localhost:18090/realms/minierp-local
+      Auth__Audience: minierp-api
+      Auth__BackchannelBaseUrl: http://host.docker.internal:18090
       Media__S3Endpoint: http://object-storage:9000
       Media__AccessKey: ${OBJECT_STORAGE_ACCESS_KEY:?Set OBJECT_STORAGE_ACCESS_KEY in the local environment file}
       Media__SecretKey: ${OBJECT_STORAGE_SECRET_KEY:?Set OBJECT_STORAGE_SECRET_KEY in the local environment file}

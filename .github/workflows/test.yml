@@ -38,10 +38,9 @@ jobs:
       - name: Generate disposable CI credentials
         shell: bash
         run: |
-          umask 077
-          printf 'POSTGRES_PASSWORD=%s\nOBJECT_STORAGE_ACCESS_KEY=%s\nOBJECT_STORAGE_SECRET_KEY=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 12)" "$(openssl rand -hex 24)" > deploy/environments/ci.env
-      - name: Start isolated six-service stack
-        run: docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml up -d --build --wait --wait-timeout 240
+          node scripts/ci/prepare-identity.cjs
+      - name: Start isolated stack with real OIDC provider
+        run: docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml up -d --build --wait --wait-timeout 300
       - name: Install browser for UI smoke
         run: |
           npm install --prefix "$RUNNER_TEMP/ui" playwright@1.56.1
@@ -55,10 +54,12 @@ jobs:
           docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml exec -T postgres sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
           test "$(docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml exec -T redis redis-cli ping)" = PONG
       - name: Verify persistence after API restart
+        env:
+          NODE_PATH: ${{ runner.temp }}/ui/node_modules
         run: |
           docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml restart api
           docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml up -d --wait --wait-timeout 120
-          node -e "fetch('http://127.0.0.1:13000/api/v1/plm/models').then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(v=>{if(!v.data.some(m=>m.code==='CI-MODEL'))throw Error('Persistence failed')}).catch(e=>{console.error(e);process.exit(1)})"
+          node scripts/ci/smoke.cjs --persistence-only
       - uses: actions/upload-artifact@v4
         if: always()
         with:
