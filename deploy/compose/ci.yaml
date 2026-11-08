@@ -4,10 +4,10 @@ services:
     image: quay.io/keycloak/keycloak:26.8.1
     command: [start-dev, --import-realm]
     environment:
-      KC_HOSTNAME: http://127.0.0.1:18090
+      KC_HOSTNAME: http://127.0.0.1:18091
       KC_HEALTH_ENABLED: 'true'
     ports:
-      - '127.0.0.1:18090:8080'
+      - '127.0.0.1:18091:8080'
     volumes:
       - ../../TestResults/identity/ci-realm.json:/opt/keycloak/data/import/minierp-ci-realm.json:ro
     healthcheck:
@@ -54,7 +54,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: '8080'
-      Auth__Authority: http://127.0.0.1:18090/realms/minierp-ci
+      Auth__Authority: http://127.0.0.1:18091/realms/minierp-ci
       Auth__Audience: minierp-api
       Auth__BackchannelBaseUrl: http://keycloak:8080
       ConnectionStrings__Primary: 'Host=postgres;Database=minierp_ci;Username=minierp_ci;Password=${POSTGRES_PASSWORD:?Required}'
@@ -87,7 +87,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/web.Dockerfile
       args:
-        VITE_OIDC_AUTHORITY: http://127.0.0.1:18090/realms/minierp-ci
+        VITE_OIDC_AUTHORITY: http://127.0.0.1:18091/realms/minierp-ci
         VITE_OIDC_CLIENT_ID: minierp-web
     environment:
       API_UPSTREAM: http://api:8080

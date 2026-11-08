@@ -19,11 +19,28 @@ const post = (path, body, status) => request(path, status, {
   await request('/health/ready');
   await request('/api/v1/plm/models', 401);
   await request('/api/v1/plm/models', 401, {headers:{Authorization:'Bearer malformed-token'}});
-  const browser = await chromium.launch({headless:true, args:['--no-sandbox']});
+  const browser = await chromium.launch({headless:true, args:['--no-sandbox'], ...(process.env.PLAYWRIGHT_CHANNEL ? {channel:process.env.PLAYWRIGHT_CHANNEL} : {})});
   try {
   const page = await browser.newPage();
   const errors = [];
+  const adapterTokens = new Set();
+  const tokenReads = [];
   page.on('pageerror', error => errors.push(error.message));
+  page.on('response', response => {
+    if (!response.url().endsWith('/protocol/openid-connect/token') || response.status() !== 200) return;
+    tokenReads.push(response.json().then(body => {
+      for (const key of ['access_token', 'refresh_token', 'id_token']) {
+        if (typeof body[key] === 'string') adapterTokens.add(body[key]);
+      }
+    }).catch(() => { errors.push('OIDC token response inspection failed'); }));
+  });
+  async function assertMemoryOnlyTokens() {
+    await Promise.all(tokenReads);
+    assert.ok(adapterTokens.size >= 2, 'Inspect adapter access and refresh tokens from real OIDC response');
+    const stored = await page.evaluate(() => [...Object.values(localStorage), ...Object.values(sessionStorage)]);
+    assert.ok(stored.every(value => !/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.test(value)), 'JWT must not persist in browser storage');
+    assert.ok(stored.every(value => [...adapterTokens].every(secret => !value.includes(secret))), 'Adapter access/refresh/ID tokens must remain in memory');
+  }
   const authenticated = page.waitForRequest(req => req.url().startsWith(base + '/api/') && /^Bearer /.test(req.headers().authorization || ''), {timeout:60000});
   await page.goto(base + '/plm-models');
   await page.getByRole('button', {name:'Oturum aç', exact:true}).click();
@@ -33,8 +50,9 @@ const post = (path, body, status) => request(path, status, {
   await page.locator('#password').fill(credentials.CI_PASSWORD);
   await page.locator('#kc-login').click();
   token = (await authenticated).headers().authorization.slice(7);
+  adapterTokens.add(token);
   const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
-  assert.equal(claims.iss, 'http://127.0.0.1:18090/realms/minierp-ci');
+  assert.equal(claims.iss, 'http://127.0.0.1:18091/realms/minierp-ci');
   assert.ok([claims.aud].flat().includes('minierp-api'));
   if (process.argv.includes('--persistence-only')) {
     const persisted = await (await request('/api/v1/plm/models')).json();
@@ -70,13 +88,36 @@ const post = (path, body, status) => request(path, status, {
     await page.screenshot({path:'TestResults/ci-ui.png', fullPage:true});
     assert.deepEqual(errors, []);
     // Auth tokens may only exist in the running SPA, never browser persistent stores.
-    const stored = await page.evaluate(() => [...Object.values(localStorage), ...Object.values(sessionStorage)]);
-    assert.ok(stored.every(value => !value.includes(token)), 'Access token must not persist in browser storage');
+    await assertMemoryOnlyTokens();
     await page.getByRole('button', {name:'Oturumu kapat', exact:true}).click();
     await page.getByRole('button', {name:'Oturum aç', exact:true}).click();
     await page.locator('#username').waitFor({timeout:30000});
     token = undefined;
     await request('/api/v1/plm/models', 401);
+    // A second genuine login proves the provider session ended; simulate only the
+    // ERP audit failure so logout must still clear the real Keycloak session.
+    const secondAuthenticated = page.waitForRequest(req => req.url().startsWith(base + '/api/') && /^Bearer /.test(req.headers().authorization || ''), {timeout:60000});
+    await page.locator('#username').fill(credentials.CI_USER);
+    await page.locator('#password').fill(credentials.CI_PASSWORD);
+    await page.locator('#kc-login').click();
+    token = (await secondAuthenticated).headers().authorization.slice(7);
+    adapterTokens.add(token);
+    await page.getByRole('button', {name:'Oturumu kapat', exact:true}).waitFor();
+    await assertMemoryOnlyTokens();
+    let failedLogoutAudit = false;
+    await page.route('**/api/v1/auth/events', async route => {
+      if (route.request().postDataJSON()?.event !== 'logout') return route.continue();
+      failedLogoutAudit = true;
+      await route.fulfill({status:503, contentType:'application/json', body:'{"title":"CI audit unavailable"}'});
+    });
+    await page.getByRole('button', {name:'Oturumu kapat', exact:true}).click();
+    await page.getByRole('button', {name:'Oturum aç', exact:true}).waitFor();
+    assert.ok(failedLogoutAudit, 'Logout audit 503 fixture must execute');
+    await page.getByRole('button', {name:'Oturum aç', exact:true}).click();
+    await page.locator('#username').waitFor({timeout:30000});
+    token = undefined;
+    await request('/api/v1/plm/models', 401);
+    assert.deepEqual(errors, []);
   } finally { await browser.close(); }
-  console.log('PASS: real OIDC Code/PKCE login/logout, anonymous 401, API 200/400/404/409, S3 image round trip, UI data/error/recovery');
+  console.log('PASS: real OIDC Code/PKCE login/logout and audit-503 logout, memory-only tokens, anonymous 401, API 200/400/404/409, S3 image round trip, UI data/error/recovery');
 })().catch(error => { console.error(error.message); process.exitCode = 1; });
