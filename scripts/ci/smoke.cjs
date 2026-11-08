@@ -6,6 +6,7 @@ const base = process.env.CI_BASE_URL || 'http://127.0.0.1:13000';
 if (!/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(base)) throw new Error('Smoke writes require a loopback disposable stack');
 const credentials = Object.fromEntries(fs.readFileSync(process.env.CI_ENV_FILE || 'deploy/environments/ci.env', 'utf8').split(/\r?\n/).filter(line => line.includes('=')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
 let token;
+const adapterTokens = new Set();
 async function request(path, status = 200, options = {}) {
   const response = await fetch(base + path, {...options, headers:{...(token ? {Authorization:`Bearer ${token}`} : {}), ...options.headers}});
   assert.equal(response.status, status, `${options.method || 'GET'} ${path}`);
@@ -23,7 +24,6 @@ const post = (path, body, status) => request(path, status, {
   try {
   const page = await browser.newPage();
   const errors = [];
-  const adapterTokens = new Set();
   const tokenReads = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => {
@@ -120,4 +120,12 @@ const post = (path, body, status) => request(path, status, {
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
   console.log('PASS: real OIDC Code/PKCE login/logout and audit-503 logout, memory-only tokens, anonymous 401, API 200/400/404/409, S3 image round trip, UI data/error/recovery');
-})().catch(error => { console.error(error.message); process.exitCode = 1; });
+})().catch(error => {
+  // Playwright timeout call logs can include fill() arguments. Never emit the
+  // disposable password, other env values, or observed tokens in CI logs.
+  let message = String(error.message);
+  for (const secret of [...Object.values(credentials), ...adapterTokens])
+    if (secret) message = message.split(secret).join('[REDACTED]');
+  console.error(message);
+  process.exitCode = 1;
+});
