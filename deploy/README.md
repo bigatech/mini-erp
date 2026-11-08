@@ -17,7 +17,7 @@ Copy the local template to an ignored local environment file:
 Copy-Item deploy/environments/local.env.example deploy/environments/local.env
 ```
 
-The template credentials are for local development only. Change them in `deploy/environments/local.env` if needed; do not commit that file or reuse its values elsewhere.
+Fill `POSTGRES_PASSWORD`, `OBJECT_STORAGE_ACCESS_KEY` and `OBJECT_STORAGE_SECRET_KEY` in the ignored file with newly generated unique values before starting. The template contains no credentials. Never commit populated environment files or reuse production values locally.
 
 Validate the Compose configuration and start the services:
 
