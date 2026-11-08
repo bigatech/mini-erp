@@ -1,0 +1,19 @@
+services:
+  postgres:
+    volumes: [cloud-dev-postgres:/var/lib/postgresql]
+  object-storage:
+    volumes: [cloud-dev-minio:/data]
+  api:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+  worker:
+    environment:
+      DOTNET_ENVIRONMENT: Development
+  web:
+    build:
+      args:
+        VITE_API_URL: ''
+        VITE_APP_ENVIRONMENT: Development
+volumes:
+  cloud-dev-postgres:
+  cloud-dev-minio:

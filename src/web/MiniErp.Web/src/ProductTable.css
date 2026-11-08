@@ -1,0 +1,10 @@
+.product-table .product-table-sort{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;color:inherit;font:inherit;font-weight:600;padding:6px 0;cursor:pointer}
+.product-table .product-table-sort:focus-visible,.product-table-pagination button:focus-visible,.product-table-pagination select:focus-visible{outline:2px solid #557f63;outline-offset:3px}
+.product-table .product-table-actions{display:flex;gap:6px;align-items:center}
+.product-table-pagination{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:14px;border-top:1px solid #e5ebe6;color:#627168;font-size:11px}
+.product-table-pagination label{display:flex;align-items:center;gap:7px}
+.product-table-pagination select,.product-table-pagination button{border:1px solid #dfe7e1;border-radius:6px;padding:7px 9px;background:#fff;color:#55715e;font:inherit}
+.product-table-pagination select{min-height:32px}
+.product-table-pagination button{cursor:pointer}
+.product-table-pagination button:disabled{opacity:.45;cursor:default}
+.product-table-page-buttons{display:flex;gap:5px}

@@ -1,0 +1,16 @@
+{
+  "name": "MiniERP cloud development",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:2.3.4-10.0-noble",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+    "ghcr.io/devcontainers/features/azure-cli:1": {}
+  },
+  "forwardPorts": [13000],
+  "portsAttributes": {
+    "13000": { "label": "MiniERP private preview", "visibility": "private" }
+  },
+  "postCreateCommand": "bash scripts/ci/dev-start.sh",
+  "remoteUser": "vscode",
+  "hostRequirements": { "cpus": 4, "memory": "8gb", "storage": "32gb" }
+}

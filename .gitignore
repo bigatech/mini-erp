@@ -1,0 +1,48 @@
+# .NET build output
+**/bin/
+**/obj/
+*.user
+*.suo
+
+# Frontend dependencies and generated output
+node_modules/
+dist/
+build/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+deploy/environments/local.env
+deploy/environments/*.env
+!deploy/environments/*.env.example
+secrets/
+
+# IDE and OS files
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+**/TestResults/
+*.tsbuildinfo
+
+# Local container data
+**/data/
+**/volumes/
+artifacts/api-validation-build/
+artifacts/dashboard-api-publish/
+artifacts/
+outputs/
+sample-data/
+*.pem
+*.pfx
+*.key
+# Generated IaC output can include deployment metadata.
+deploy/azure/*.json
+deploy/azure/*.parameters.json
+**/__pycache__/
+
+# Local source-document conversions (may contain customer/personnel details)
+outputs/analytics-pdf-20261102/
+tmp/

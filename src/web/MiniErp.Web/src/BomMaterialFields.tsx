@@ -1,0 +1,8 @@
+import React from 'react'
+export type MaterialGroup={code:string;name:string;fields:{code:string;name:string;dataType:string;unit?:string|null}[]}
+export default function BomMaterialFields({api,group,attributes,onGroup,onAttributes}:{api:string;group:string;attributes:Record<string,string>;onGroup:(value:string)=>void;onAttributes:(value:Record<string,string>)=>void}){
+ const [groups,setGroups]=React.useState<MaterialGroup[]>([]),[error,setError]=React.useState('')
+ React.useEffect(()=>{const c=new AbortController();void fetch(api+'/api/v1/definitions/material-groups',{signal:c.signal}).then(async r=>{const b=await r.json();if(!r.ok)throw new Error(b.title||'Malzeme grupları alınamadı.');if(!c.signal.aborted)setGroups(b.data)}).catch(e=>{if(!c.signal.aborted)setError(e.message)});return()=>c.abort()},[api])
+ const selected=groups.find(g=>g.code===group)
+ return <>{error&&<p role="alert">{error}</p>}<label className="definition-label">Malzeme grubu<select aria-label="BOM malzeme grubu" value={group} onChange={e=>{onGroup(e.target.value);onAttributes({})}}><option value="">Grup seçin / öznitelik yok</option>{groups.map(g=><option value={g.code} key={g.code}>{g.name}</option>)}</select></label>{selected?.fields.map(f=><label className="definition-label" key={f.code}>{f.name}{f.unit?` (${f.unit})`:''}<input aria-label={`Malzeme öz niteliği ${f.name}`} type={f.dataType==='number'?'number':'text'} step={f.dataType==='number'?'any':undefined} min={f.dataType==='number'?'0':undefined} maxLength={f.dataType==='number'?undefined:2000} value={attributes[f.code]||''} onChange={e=>onAttributes({...attributes,[f.code]:e.target.value})}/></label>)}</>
+}

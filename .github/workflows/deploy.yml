@@ -1,0 +1,90 @@
+name: Deploy
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Protected GitHub Environment (Azure deployment is manual only)
+        type: choice
+        options: [development, production]
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+  test:
+    uses: ./.github/workflows/test.yml
+  deploy:
+    needs: [build, test]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      LOCATION: ${{ vars.AZURE_LOCATION }}
+      PREFIX: ${{ vars.AZURE_NAME_PREFIX }}
+      TARGET_ENV: ${{ inputs.environment }}
+      PRIMARY_URI: ${{ secrets.PRIMARY_CONNECTION_SECRET_URI }}
+      S3_ACCESS_URI: ${{ secrets.S3_ACCESS_KEY_SECRET_URI }}
+      S3_SECRET_URI: ${{ secrets.S3_SECRET_KEY_SECRET_URI }}
+      S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require complete environment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in RESOURCE_GROUP LOCATION PREFIX TARGET_ENV PRIMARY_URI S3_ACCESS_URI S3_SECRET_URI S3_ENDPOINT; do
+            test -n "${!key}" || { echo "Missing environment configuration: $key"; exit 1; }
+          done
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Provision stateless foundation
+        run: |
+          set -euo pipefail
+          az group show --name "$RESOURCE_GROUP" > /dev/null
+          az deployment group create --name foundation --resource-group "$RESOURCE_GROUP" \
+            --template-file deploy/azure/main.bicep \
+            --parameters namePrefix="$PREFIX" location="$LOCATION" environmentName="$TARGET_ENV" \
+            --query properties.outputs > "$RUNNER_TEMP/foundation.json"
+          echo "ACR_NAME=$(jq -r .registryName.value "$RUNNER_TEMP/foundation.json")" >> "$GITHUB_ENV"
+          echo "ACR_SERVER=$(jq -r .registryServer.value "$RUNNER_TEMP/foundation.json")" >> "$GITHUB_ENV"
+      - name: Publish commit-addressed application images
+        run: |
+          set -euo pipefail
+          az acr login --name "$ACR_NAME"
+          for component in api worker web; do
+            image="$ACR_SERVER/minierp-$component:$GITHUB_SHA"
+            docker build -f "deploy/docker/$component.Dockerfile" -t "$image" .
+            docker push "$image"
+          done
+      - name: Deploy internal application revisions
+        run: |
+          set -euo pipefail
+          az deployment group create --name applications --resource-group "$RESOURCE_GROUP" \
+            --template-file deploy/azure/apps.bicep \
+            --parameters namePrefix="$PREFIX" location="$LOCATION" environmentName="$TARGET_ENV" \
+              environmentId="$(jq -r .environmentId.value "$RUNNER_TEMP/foundation.json")" \
+              identityId="$(jq -r .identityId.value "$RUNNER_TEMP/foundation.json")" \
+              registryServer="$ACR_SERVER" imageTag="$GITHUB_SHA" \
+              primaryConnectionSecretUri="$PRIMARY_URI" s3AccessKeySecretUri="$S3_ACCESS_URI" \
+              s3SecretKeySecretUri="$S3_SECRET_URI" s3Endpoint="$S3_ENDPOINT" \
+            --query properties.outputs
+      - name: Require healthy active revisions
+        run: |
+          set -euo pipefail
+          for component in api web; do
+            state=$(az containerapp show -g "$RESOURCE_GROUP" -n "$PREFIX-$component" --query properties.runningStatus -o tsv)
+            test "$state" = Running || { echo "$component is not Running"; exit 1; }
+          done
+          echo 'Internal deployment only. Public URL and business acceptance remain separate release gates.' >> "$GITHUB_STEP_SUMMARY"

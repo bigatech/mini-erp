@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\modules\Cutting\Cutting.Composition\Cutting.Composition.csproj" />
+    <ProjectReference Include="..\..\modules\SalesDrafts\SalesDrafts.Composition\SalesDrafts.Composition.csproj" />
+    <ProjectReference Include="..\..\modules\SharedKernel\SharedKernel.Composition\SharedKernel.Composition.csproj" />
+    <ProjectReference Include="..\..\modules\ProductLifecycle\ProductLifecycle.Composition\ProductLifecycle.Composition.csproj" />
+    <ProjectReference Include="..\..\modules\DataIntakeAnalytics\DataIntakeAnalytics.Composition\DataIntakeAnalytics.Composition.csproj" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.20.1" />
+  </ItemGroup>
+</Project>
+

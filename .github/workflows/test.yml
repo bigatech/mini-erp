@@ -1,0 +1,59 @@
+name: Test
+on:
+  push:
+    branches: [main, develop, 'codex/**']
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore MiniErp.sln
+      - run: dotnet test MiniErp.sln --no-restore --configuration Release --logger trx --results-directory TestResults
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: TestResults/*.trx
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      COMPOSE_PROJECT_NAME: minierp-ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate disposable CI credentials
+        shell: bash
+        run: |
+          umask 077
+          printf 'POSTGRES_PASSWORD=%s\nOBJECT_STORAGE_ACCESS_KEY=%s\nOBJECT_STORAGE_SECRET_KEY=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 12)" "$(openssl rand -hex 24)" > deploy/environments/ci.env
+      - name: Start isolated six-service stack
+        run: docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml up -d --build --wait --wait-timeout 240
+      - name: Install browser for UI smoke
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ui" playwright@1.56.1
+          "$RUNNER_TEMP/ui/node_modules/.bin/playwright" install --with-deps chromium
+      - name: API, persistence, S3 and UI integration smoke
+        env:
+          NODE_PATH: ${{ runner.temp }}/ui/node_modules
+        run: node scripts/ci/smoke.cjs
+      - name: Verify PostgreSQL and Redis protocols
+        run: |
+          docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml exec -T postgres sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+          test "$(docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml exec -T redis redis-cli ping)" = PONG
+      - name: Collect status
+        if: always()
+        run: docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml ps -a
+      - name: Remove disposable stack
+        if: always()
+        run: docker compose --env-file deploy/environments/ci.env -f deploy/compose/ci.yaml down --volumes --remove-orphans

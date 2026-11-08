@@ -1,0 +1,33 @@
+name: Build
+on:
+  push:
+    branches: [main, develop, 'codex/**']
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore MiniErp.sln
+      - run: dotnet build MiniErp.sln --no-restore --configuration Release
+      - uses: docker/setup-buildx-action@v3
+      - name: Build all application images
+        run: |
+          for component in api worker web; do
+            docker build -f "deploy/docker/$component.Dockerfile" -t "minierp-$component:${{ github.sha }}" .
+          done
+      - name: Compile Bicep
+        run: |
+          az bicep build --file deploy/azure/main.bicep --stdout > /dev/null
+          az bicep build --file deploy/azure/apps.bicep --stdout > /dev/null
+          az bicep build --file deploy/azure/postgres.bicep --stdout > /dev/null
+      - name: Validate workflow syntax
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -shellcheck= .github/workflows/*.yml
