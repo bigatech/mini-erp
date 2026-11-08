@@ -57,7 +57,7 @@ function initialize() {
   // Preserve only the application path across the top-level SSO check; no tokens
   // or OIDC callback parameters are written to application storage.
   if (!initialized && location.pathname !== '/auth/callback')
-    sessionStorage.setItem('minierp.returnTo', location.pathname)
+    sessionStorage.setItem('minierp.returnTo', location.pathname + location.search)
   initialized ??= keycloak.init({
     onLoad: 'check-sso',
     checkLoginIframe: false, pkceMethod: 'S256', flow: 'standard', responseMode: 'query',
@@ -107,7 +107,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   async function login() {
     setBusy(true); setError('')
     try {
-      sessionStorage.setItem('minierp.returnTo', location.pathname)
+      sessionStorage.setItem('minierp.returnTo', location.pathname + location.search)
       await keycloak.login({ redirectUri: `${location.origin}/auth/callback` })
     } catch { setBusy(false); setError('Giriş başlatılamadı. Kimlik sağlayıcısını kontrol edin.') }
   }
