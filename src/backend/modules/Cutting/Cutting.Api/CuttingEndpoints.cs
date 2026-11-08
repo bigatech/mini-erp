@@ -4,7 +4,6 @@ using Cutting.Application;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Hosting;
 namespace Cutting.Api;
 
 public static class CuttingEndpoints
@@ -14,13 +13,9 @@ public static class CuttingEndpoints
         var group=endpoints.MapGroup("/api/v1/cutting").WithTags("Cutting");
         group.AddEndpointFilter(async(context,next)=>
         {
-            var env=context.HttpContext.RequestServices.GetService(typeof(IHostEnvironment)) as IHostEnvironment;
-            if(env?.IsDevelopment()!=true)
-            {
-                if(context.HttpContext.User.Identity?.IsAuthenticated!=true)return Results.Unauthorized();
-                var permission=HttpMethods.IsPut(context.HttpContext.Request.Method)?"cutting.write":"cutting.read";
-                if(!context.HttpContext.User.HasClaim("permission",permission))return Results.StatusCode(403);
-            }
+            if(context.HttpContext.User.Identity?.IsAuthenticated!=true)return Results.Unauthorized();
+            var permission=HttpMethods.IsPut(context.HttpContext.Request.Method)?"cutting.write":"cutting.read";
+            if(!context.HttpContext.User.HasClaim("permission",permission))return Results.StatusCode(403);
             return await next(context);
         });
         group.MapGet("/options",async(ICuttingStore store,CancellationToken ct)=>await Run(async()=>Results.Ok(await store.OptionsAsync(ct))));

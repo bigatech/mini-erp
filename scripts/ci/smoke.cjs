@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const base = process.env.CI_BASE_URL || 'http://127.0.0.1:13000';
 if (!/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(base)) throw new Error('Smoke writes require a loopback disposable stack');
 const credentials = Object.fromEntries(fs.readFileSync(process.env.CI_ENV_FILE || 'deploy/environments/ci.env', 'utf8').split(/\r?\n/).filter(line => line.includes('=')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
@@ -73,6 +74,19 @@ const post = (path, body, status) => request(path, status, {
   assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), image, 'S3 round trip');
   assert.equal((await (await request(`/api/v1/plm/models/${model.id}/images`)).json()).data.length, 1);
   await request('/api/v1/does-not-exist', 404);
+  // Authentication alone never grants the existing Cutting read/write permissions.
+  // The disposable user has neither permission; denied writes must not create data.
+  const deniedCuttingId = crypto.randomUUID();
+  for (const path of ['options', 'records', `records/${deniedCuttingId}`, `records/${deniedCuttingId}/events`, 'report'])
+    await request('/api/v1/cutting/' + path, 403);
+  await request(`/api/v1/cutting/records/${deniedCuttingId}`, 403, {
+    method:'PUT', headers:{'Content-Type':'application/json', 'If-None-Match':'*'},
+    body:JSON.stringify({orderId:crypto.randomUUID(), orderVersion:1, status:'Draft', groups:[]})
+  });
+  await page.goto(base + '/analytics-data');
+  await page.getByRole('alert').filter({hasText:'İşlem başarısız (403).'}).waitFor();
+  assert.equal(await page.getByLabel('Kesim kayıt listesi').locator('tbody tr button').count(), 0,
+    'No Cutting record may appear after denied read');
     await page.goto(base + '/plm-models');
     await page.getByLabel('PLM model seçimi').selectOption(model.id);
     await page.getByText('CI-MODEL · CI synthetic model', {exact:true}).waitFor();
@@ -119,7 +133,7 @@ const post = (path, body, status) => request(path, status, {
     await request('/api/v1/plm/models', 401);
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
-  console.log('PASS: real OIDC Code/PKCE login/logout and audit-503 logout, memory-only tokens, anonymous 401, API 200/400/404/409, S3 image round trip, UI data/error/recovery');
+  console.log('PASS: real OIDC Code/PKCE login/logout and audit-503 logout, memory-only tokens, anonymous 401, Cutting permission 403 and UI denial, API 200/400/404/409, S3 image round trip, UI data/error/recovery');
 })().catch(error => {
   // Playwright timeout call logs can include fill() arguments. Never emit the
   // disposable password, other env values, or observed tokens in CI logs.
