@@ -2,6 +2,8 @@
   "realm": "minierp-local",
   "enabled": true,
   "sslRequired": "none",
+  "eventsEnabled": true,
+  "enabledEventTypes": ["LOGIN", "LOGIN_ERROR", "LOGOUT", "CODE_TO_TOKEN_ERROR"],
   "clients": [
     {
       "clientId": "minierp-web",
@@ -16,8 +18,14 @@
       "redirectUris": ["http://localhost:3000/auth/callback"],
       "webOrigins": ["http://localhost:3000"],
       "attributes": {
-        "pkce.code.challenge.method": "S256"
-      }
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      },
+      "protocolMappers": [{
+        "name": "minierp-api-audience", "protocol": "openid-connect",
+        "protocolMapper": "oidc-audience-mapper", "consentRequired": false,
+        "config": {"included.custom.audience": "minierp-api", "access.token.claim": "true", "id.token.claim": "false"}
+      }]
     }
   ]
 }

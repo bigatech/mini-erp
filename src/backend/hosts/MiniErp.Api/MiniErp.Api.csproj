@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.7" />
     <ProjectReference Include="..\..\modules\Cutting\Cutting.Composition\Cutting.Composition.csproj" />
     <ProjectReference Include="..\..\modules\SalesDrafts\SalesDrafts.Composition\SalesDrafts.Composition.csproj" />
     <ProjectReference Include="..\..\modules\SharedKernel\SharedKernel.Composition\SharedKernel.Composition.csproj" />

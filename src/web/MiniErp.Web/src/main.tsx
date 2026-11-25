@@ -1,4 +1,5 @@
 import React from 'react'
+import { AuthGate } from './auth'
 import BomMaterialFields from './BomMaterialFields'
 import { createRoot } from 'react-dom/client'
 import './style.css'
@@ -167,5 +168,5 @@ function App() {
  {isImports&&<><section className="panel data-quality"><h2>Kaynak doğrulaması</h2><p>XLS, XLSX ve ODS tüm sayfalarıyla, CSV başlıklarıyla alınır. Aynı dosya içeriğinin yeniden yüklenmesi engellenir. Özet/Derleme sayfaları ham staging içinde korunur ve süreç KPI’larına katılmaz.</p><p>Destek: CSV, XLSX, XLS, ODS, PDF · 20 MB · PDF için OCR incelemesi gerekebilir. XLS raporları doğrudan okunur.</p></section><section className="panel imports-panel"><div className="panel-heading"><div><h2>Yüklenen kaynaklar</h2><p>Dosyayı seçerek staging hücrelerini inceleyin.</p></div><span>{files.length} dosya</span></div><div className="recent-files">{files.map(file=><button className="recent-file" key={file.id} onClick={()=>void get<ImportFile>(`/api/v1/data-intake/imports/${file.id}`).then(setPreview).catch(e=>setError(e.message))}><span className="file-type">{file.fileName.split('.').at(-1)?.toUpperCase()}</span><span className="file-info"><b>{file.fileName}</b><small>{new Date(file.uploadedAt).toLocaleString('tr-TR')} · {(file.fileSize/1024).toFixed(0)} KB</small></span><span className="import-status">{file.status==='NeedsReview'?'İnceleme gerekli':file.status==='Superseded'?'Yeni sürümle yenilendi':'Staging kaydedildi'}</span></button>)}{!files.length&&<p className="empty-message">Henüz dosya yüklenmedi.</p>}</div></section>{preview&&<section className="panel source-panel"><div className="panel-heading"><div><h2>{preview.fileName}</h2><p>Staging önizleme · ilk 50 satır · {preview.rows?.length} toplam satır · __sheet / __row kaynak konumu</p></div></div><div className="table-wrap preview-table"><table><thead><tr>{preview.columns.map((c,i)=><th key={i}>{c}</th>)}</tr></thead><tbody>{preview.rows?.slice(0,50).map((r,i)=><tr key={i}>{r.map((c,j)=><td key={j}>{c}</td>)}</tr>)}</tbody></table></div></section>}</>}
  <footer className="page-footer"><span>Mini ERP · Görenler Tekstil</span><span>PostgreSQL staging · {new Date().toLocaleDateString('tr-TR')}</span></footer></div></main></div>
 }
-createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>)
+createRoot(document.getElementById('root')!).render(<React.StrictMode><AuthGate><App/></AuthGate></React.StrictMode>)
 
